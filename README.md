@@ -1,16 +1,8 @@
 # A Generative AI System for Personalized Cartoon Images and Captions
  
-Project By 
-**Paolo Ferrara**	 
-ferrara.pao@northeastern.edu   
-**Muhammad Arish Salam Bukhari** 
-bukhari.mu@northeastern.edu 
-**Shan Lin** 
-lin.shan1@northeastern.edu 
-**Patricia Atkinson** 
-atkinson.p@northeastern.edu 
+Project By **Paolo Ferrara**|ferrara.pao@northeastern.edu , **Muhammad Arish Salam Bukhari** | bukhari.mu@northeastern.edu, **Shan Lin** | lin.shan1@northeastern.edu, **Patricia Atkinson** | atkinson.p@northeastern.edu 
 
-May 30th, 2025 
+**May 30th, 2025**
 
 # 1. Project Description 
 
