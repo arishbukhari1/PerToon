@@ -18,7 +18,63 @@ We consider this project as a prototype for a Generative AI product targeting th
 
 # Innovation 
 
-While both cartoonization and text generation are independently well-studied, this project’s innovation lies in the seamless integration into a unified, expressive pipeline, turning a static photo and brief user prompt into an emotionally resonant, stylized digital product. This approach is not only technically diverse but creatively impactful, serving as a proof-of-concept for learning multimodal Generative AI systems. 
+While both cartoonization and text generation are independently well-studied, this project's innovation lies in the seamless integration into a unified, expressive pipeline, turning a static photo and brief user prompt into an emotionally resonant, stylized digital product. This approach is not only technically diverse but creatively impactful, serving as a proof-of-concept for learning multimodal Generative AI systems. 
+
+# Setup and Installation
+
+## Prerequisites
+
+- Python 3.7 or higher
+- Git
+
+## Installation Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd PerToon
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Download required model files:**
+   
+   The project requires two pre-trained model files (~1.1GB each) that are too large to include in the repository:
+   
+   ```bash
+   # Automatic download (recommended)
+   python models/download_models.py
+   ```
+   
+   **Manual download (alternative):**
+   - Download `genA2B_final.pth` from [Google Drive](https://drive.google.com/file/d/15bSGDiqQhLXh35eSUvJNdymakHrzeZ5c/view?usp=sharing)
+   - Download `genB2A_final.pth` from [Google Drive](https://drive.google.com/file/d/12NpKowJwEDIE1wqtPqCdPEMcLoJGzHeQ/view?usp=sharing)
+   - Place both files in the `models/` directory
+
+4. **Verify installation:**
+   ```bash
+   # Check that models are downloaded
+   ls models/*.pth
+   
+   # Should show:
+   # models/genA2B_final.pth
+   # models/genB2A_final.pth
+   ```
+
+## Quick Start
+
+Once setup is complete, you can run the notebooks to see the system in action:
+
+- **Image Acquisition:** `scripts/1a_image_acquisition.ipynb`
+- **Image Processing:** `scripts/1b_image_processing.ipynb`
+- **Model Setup:** `scripts/2a_model_setup.ipynb`
+- **Caption Generation:** `scripts/2b_caption_generation.ipynb`
+- **Meme Creation:** `scripts/3a_meme_overlay_caption.ipynb`
+
+For detailed information about the models, see [`models/README.md`](models/README.md).
 
 # 2. Problem Statement 
 

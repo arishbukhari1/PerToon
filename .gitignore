@@ -199,3 +199,9 @@ cython_debug/
 # Clojure-related (if using Clojure tools)
 .clj-kondo/
 .virtual_documents/
+
+# Large model files
+# These files are too large for git and should be downloaded separately
+# Use scripts/download_models.py to download them
+models/*.pth
+*.pth
