@@ -19,13 +19,13 @@ Run the download script from this directory:
 
 ```bash
 cd models
-python download_models.py
+python download_vision_models.py
 ```
 
 Or from the project root:
 
 ```bash
-python models/download_models.py
+python models/download_vision_models.py
 ```
 
 This will automatically download both model files from Google Drive and place them in this directory.
@@ -43,7 +43,7 @@ After downloading, you should have:
 ```
 models/
 ├── README.md (this file)
-├── download_models.py (download script)
+├── download_vision_models.py (vision model download script)
 ├── genA2B_final.pth
 └── genB2A_final.pth
 ```

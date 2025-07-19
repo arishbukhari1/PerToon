@@ -46,7 +46,7 @@ While both cartoonization and text generation are independently well-studied, th
    
    ```bash
    # Automatic download (recommended)
-   python models/download_models.py
+   python models/download_vision_models.py
    ```
    
    **Manual download (alternative):**

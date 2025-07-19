@@ -202,6 +202,6 @@ cython_debug/
 
 # Large model files
 # These files are too large for git and should be downloaded separately
-# Use scripts/download_models.py to download them
+# Use models/download_vision_models.py to download them
 models/*.pth
 *.pth

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Download pre-trained model files.
+Download pre-trained vision model files.
 
-This script downloads the required .pth model files from Google Drive
-and places them in the current directory (models/).
+This script downloads the required .pth vision model files from Google Drive
+for cartoonization and places them in the current directory (models/).
 """
 
 import sys
@@ -23,11 +23,11 @@ def download_file_from_google_drive(file_id, destination):
     return True
 
 def main():
-    """Download all required model files."""
+    """Download all required vision model files."""
     # Use current directory (models/)
     models_dir = Path(".")
     
-    # Model file configurations
+    # Vision model file configurations
     models = [
         {
             "name": "genA2B_final.pth",
@@ -41,7 +41,7 @@ def main():
         }
     ]
     
-    print("PerToon Model Downloader")
+    print("PerToon Vision Model Downloader")
     print("=" * 40)
     
     for model in models:
@@ -49,31 +49,28 @@ def main():
         
         # Check if file already exists
         if file_path.exists():
-            print(f"✓ {model['name']} already exists, skipping...")
+            print(f"✅ {model['name']} already exists - skipping")
             continue
-        
-        print(f"Downloading {model['description']}...")
-        print(f"   File: {model['name']}")
-        
-        try:
-            success = download_file_from_google_drive(model["file_id"], file_path)
             
-            if success and file_path.exists():
-                file_size = file_path.stat().st_size
-                print(f"✓ Downloaded successfully ({file_size:,} bytes)")
-            else:
-                print(f"Failed to download {model['name']}")
-                return False
-                
+        print(f"📥 Downloading {model['name']} - {model['description']}")
+        try:
+            download_file_from_google_drive(model["file_id"], file_path)
+            print(f"✅ Successfully downloaded {model['name']}")
         except Exception as e:
-            print(f"Error downloading {model['name']}: {str(e)}")
+            print(f"❌ Failed to download {model['name']}: {e}")
             return False
     
-    print("\nAll model files downloaded successfully!")
-    print(f"Models saved in: {models_dir.absolute()}")
+    print("\n🎉 All vision model downloads completed!")
+    print("\nDownloaded models:")
+    for model in models:
+        file_path = models_dir / model["name"]
+        if file_path.exists():
+            size_mb = file_path.stat().st_size / (1024 * 1024)
+            print(f"  • {model['name']} ({size_mb:.1f} MB)")
     
     return True
 
 if __name__ == "__main__":
     success = main()
-    sys.exit(0 if success else 1) 
+    if not success:
+        sys.exit(1) 
