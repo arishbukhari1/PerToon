@@ -1,3 +1,9 @@
 Pillow
 requests
 IPython
+datasets
+pandas
+transformers
+torch
+textblob
+accelerate
