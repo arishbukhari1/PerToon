@@ -6,7 +6,7 @@ matplotlib
 pandas
 requests
 seaborn
+sentence_transformers
 textblob
 torch
 transformers
-sentence_transformers
