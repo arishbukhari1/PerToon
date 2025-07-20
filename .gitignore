@@ -200,8 +200,52 @@ cython_debug/
 .clj-kondo/
 .virtual_documents/
 
+# ML Training Artifacts (checkpoints, logs, cache)
+# Checkpoints are large intermediate training states - not for version control
+models/*/checkpoints/
+**/checkpoints/
+checkpoint-*/
+*.ckpt
+
+# HuggingFace Cache
+.cache/
+transformers_cache/
+huggingface_hub/
+
+# Training logs and artifacts
+runs/
+logs/
+tensorboard_logs/
+wandb/
+mlruns/
+
+# Large datasets (if any get added)
+data/*.csv.gz
+data/*.parquet
+data/raw/
+data/processed/
+
+# Jupyter notebook outputs (optional - keeps cell outputs in git)
+# Uncomment if you want to exclude all outputs:
+# **/*.ipynb_checkpoints/
+
 # Large model files
 # These files are too large for git and should be downloaded separately
 # Use models/download_vision_models.py to download them
 models/*.pth
 *.pth
+
+# Large model weight files (can be GB in size)
+*.safetensors
+model.safetensors
+pytorch_model.bin
+*.bin
+
+# Large tokenizer/vocab files (usually downloadable)
+tokenizer.json
+vocab.txt
+merges.txt
+
+# Keep small config files trackable:
+# config.json (usually few KB)
+# tokenizer_config.json (usually small)
