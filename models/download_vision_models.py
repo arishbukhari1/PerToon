@@ -49,18 +49,18 @@ def main():
         
         # Check if file already exists
         if file_path.exists():
-            print(f"✅ {model['name']} already exists - skipping")
+            print(f"{model['name']} already exists - skipping")
             continue
             
         print(f"📥 Downloading {model['name']} - {model['description']}")
         try:
             download_file_from_google_drive(model["file_id"], file_path)
-            print(f"✅ Successfully downloaded {model['name']}")
+            print(f"Successfully downloaded {model['name']}")
         except Exception as e:
-            print(f"❌ Failed to download {model['name']}: {e}")
+            print(f"Failed to download {model['name']}: {e}")
             return False
     
-    print("\n🎉 All vision model downloads completed!")
+    print("\nAll vision model downloads completed!")
     print("\nDownloaded models:")
     for model in models:
         file_path = models_dir / model["name"]

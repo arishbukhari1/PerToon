@@ -1,4 +1,4 @@
-# PerToon Models
+# Vision Models for Cartoonization
 
 This directory contains the pre-trained model files required for the cartoonization system.
 
