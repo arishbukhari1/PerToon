@@ -20,6 +20,45 @@ We consider this project as a prototype for a Generative AI product targeting th
 
 While both cartoonization and text generation are independently well-studied, this project's innovation lies in the seamless integration into a unified, expressive pipeline, turning a static photo and brief user prompt into an emotionally resonant, stylized digital product. This approach is not only technically diverse but creatively impactful, serving as a proof-of-concept for learning multimodal Generative AI systems. 
 
+# Repository Structure
+
+```
+PerToon/
+├── configs/                           # Configuration files for model parameters
+├── scripts/                           # Main pipeline implementation (Jupyter notebooks)
+│   ├── 1a_image_acquisition.ipynb    # Dataset collection and initial processing
+│   ├── 1b_image_processing.ipynb     # Image preprocessing and augmentation
+│   ├── 2a_nlp_model_setup.ipynb      # GPT-2 model fine-tuning setup
+│   ├── 2b_caption_generation.ipynb   # Caption generation and testing
+│   ├── 2c_nlp_imgflip_model_setup.ipynb # Alternative model setup for meme templates
+│   ├── 3a_meme_text_rendering.ipynb  # Text overlay and meme composition
+│   └── 3b_final_image_caption_integration.ipynb # Complete end-to-end pipeline
+│
+├── helpers/                           # Utility functions and shared logic
+├── models/                            # Model assets and download utilities
+│   ├── gpt2-mood-caption-v2/          # Fine-tuned GPT-2 model
+│   └── download_vision_models.py     # Script to download U-GAT-IT models
+│
+├── data/                              # Datasets and preprocessed data
+├── assets/                            # Input and output image directories
+│   ├── raw_humanface/                 # Input human face images (1000+ samples)
+│   └── memes/                         # Generated cartoon memes (output)
+│
+├── docs/                              # Project documentation
+├── Dockerfile                         # Docker containerization
+├── requirements.txt                   # Python dependencies
+└── README.md                          # Project overview and setup guide
+```
+
+## Key Components
+
+- **Main Pipeline**: `scripts/3b_final_image_caption_integration.ipynb` - Complete end-to-end execution
+- **Vision Model**: U-GAT-IT for photo-to-cartoon transformation  
+- **Language Model**: Fine-tuned GPT-2 for mood-based caption generation
+- **Configuration**: YAML files in `configs/` for easy parameter adjustment
+- **Docker Support**: Complete containerization for reproducible deployment
+- **Dataset**: 1000+ face images + emotion-labeled captions
+
 # Setup and Installation
 
 ## Prerequisites
