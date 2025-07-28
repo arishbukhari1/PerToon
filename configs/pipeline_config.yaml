@@ -1,0 +1,52 @@
+# PerToon Pipeline Configuration
+# End-to-end configuration for personalized cartoon meme generation
+
+pipeline:
+  name: "PerToon"
+  version: "1.0"
+  
+# Input/Output Settings
+io:
+  input_image_dir: "assets/raw_humanface/"
+  output_dir: "assets/memes/"
+  supported_formats: ["jpg", "jpeg", "png"]
+  max_image_size: [512, 512]
+  
+# Processing Settings
+processing:
+  cartoonize: true
+  generate_caption: true
+  overlay_text: true
+  
+# Image Processing
+image:
+  resize_before_cartoonize: true
+  target_size: [256, 256]
+  maintain_aspect_ratio: true
+  
+# Text Overlay Settings
+text_overlay:
+  font_size: 24
+  font_color: "white"
+  outline_color: "black"
+  outline_width: 2
+  position: "bottom"  # top, bottom, center
+  max_width_ratio: 0.9  # Maximum width as ratio of image width
+  padding: 20
+  
+# Batch Processing
+batch:
+  batch_size: 8
+  parallel_processing: true
+  max_workers: 4
+  
+# Quality Settings
+quality:
+  output_format: "png"
+  compression_quality: 95
+  
+# Logging
+logging:
+  level: "INFO"
+  log_file: "logs/pipeline.log"
+  enable_progress_bar: true 

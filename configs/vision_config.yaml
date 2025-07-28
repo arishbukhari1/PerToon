@@ -1,0 +1,46 @@
+# UGATIT Vision Model Configuration
+# Configuration for cartoon image generation using U-GAT-IT
+
+model:
+  name: "UGATIT"
+  dataset: "selfie2anime"
+  phase: "test"  # Default to test for inference
+  light: true
+  
+# Model Architecture
+architecture:
+  ch: 64
+  n_res: 6
+  n_dis: 6
+  img_size: 256
+  img_ch: 3
+
+# Training Parameters (for reference)
+training:
+  batch_size: 4
+  iteration: 15000
+  print_freq: 100
+  save_freq: 1000
+  decay_flag: true
+  lr: 0.0001
+  weight_decay: 0.0001
+  
+# Loss Weights
+loss_weights:
+  adv_weight: 1
+  cycle_weight: 10
+  identity_weight: 10
+  cam_weight: 1000
+
+# Paths
+paths:
+  model_dir: "models/"
+  genA2B_model: "models/genA2B_final.pth"
+  genB2A_model: "models/genB2A_final.pth"
+  input_dir: "assets/raw_humanface/"
+  output_dir: "assets/cartoonized/"
+  
+# Device Configuration
+device:
+  use_cuda: true
+  benchmark_flag: true 

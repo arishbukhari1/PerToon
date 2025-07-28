@@ -1,0 +1,62 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+docs/
+README.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Large model files (download at runtime instead)
+models/*.pth
+models/*.pt
+models/*.bin
+
+# Output directories (will be created at runtime)
+outputs/
+logs/
+results/
+checkpoints/
+
+# Temporary files
+*.tmp
+*.log 

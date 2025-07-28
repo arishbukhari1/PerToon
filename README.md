@@ -26,8 +26,28 @@ While both cartoonization and text generation are independently well-studied, th
 
 - Python 3.7 or higher
 - Git
+- CUDA-compatible GPU (recommended for faster processing)
 
-## Installation Steps
+## Installation Options
+
+### Option 1: Docker Setup (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/arishbukhari1/PerToon.git
+cd PerToon
+
+# Build Docker image
+docker build -t pertoon .
+
+# Run Docker container
+docker run -it --gpus all -v $(pwd):/app -p 8080:8080 pertoon
+
+# Start Jupyter server inside container
+docker run -it --gpus all -v $(pwd):/app -p 8080:8080 pertoon jupyter notebook --ip=0.0.0.0 --port=8080 --no-browser --allow-root
+```
+
+### Option 2: Local Setup
 
 1. **Clone the repository:**
    ```bash
@@ -35,12 +55,18 @@ While both cartoonization and text generation are independently well-studied, th
    cd PerToon
    ```
 
-2. **Install dependencies:**
+2. **Create virtual environment (recommended):**
+   ```bash
+   python -m venv pertoon_env
+   source pertoon_env/bin/activate  # On Windows: pertoon_env\Scripts\activate
+   ```
+
+3. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Download required model files:**
+4. **Download required model files:**
    
    The project requires two pre-trained model files (~1.1GB each) that are too large to include in the repository:
    
@@ -54,7 +80,7 @@ While both cartoonization and text generation are independently well-studied, th
    - Download `genB2A_final.pth` from [Google Drive](https://drive.google.com/file/d/12NpKowJwEDIE1wqtPqCdPEMcLoJGzHeQ/view?usp=sharing)
    - Place both files in the `models/` directory
 
-4. **Verify installation:**
+5. **Verify installation:**
    ```bash
    # Check that models are downloaded
    ls models/*.pth
@@ -62,17 +88,115 @@ While both cartoonization and text generation are independently well-studied, th
    # Should show:
    # models/genA2B_final.pth
    # models/genB2A_final.pth
+   
+   # Test configuration loading
+   python -c "from helpers.config_helpers import load_pipeline_config; print('Configuration loaded successfully!')"
    ```
 
-## Quick Start
+## Configuration
 
-Once setup is complete, you can run the notebooks to see the system in action:
+The project uses YAML configuration files in the `configs/` directory:
 
-- **Image Acquisition:** `scripts/1a_image_acquisition.ipynb`
-- **Image Processing:** `scripts/1b_image_processing.ipynb`
-- **Model Setup:** `scripts/2a_model_setup.ipynb`
-- **Caption Generation:** `scripts/2b_caption_generation.ipynb`
-- **Meme Creation:** `scripts/3a_meme_overlay_caption.ipynb`
+- **`vision_config.yaml`**: U-GAT-IT model parameters and paths
+- **`nlp_config.yaml`**: GPT-2 model settings and generation parameters  
+- **`pipeline_config.yaml`**: End-to-end pipeline configuration
+
+You can modify these files to customize model behavior, paths, and processing settings.
+
+## Quick Start & Usage Examples
+
+### 1. Full End-to-End Pipeline
+
+Run the complete pipeline to generate cartoon memes:
+
+```bash
+# Using Jupyter notebooks
+jupyter notebook scripts/3b_final_image_caption_integration.ipynb
+```
+
+### 2. Step-by-Step Execution
+
+For understanding each component:
+
+```bash
+# 1. Image acquisition and preprocessing
+jupyter notebook scripts/1a_image_acquisition.ipynb
+jupyter notebook scripts/1b_image_processing.ipynb
+
+# 2. Model setup and fine-tuning
+jupyter notebook scripts/2a_nlp_model_setup.ipynb
+jupyter notebook scripts/2b_caption_generation.ipynb
+
+# 3. Meme generation and integration
+jupyter notebook scripts/3a_meme_text_rendering.ipynb
+jupyter notebook scripts/3b_final_image_caption_integration.ipynb
+```
+
+### 3. Configuration Management
+
+```python
+# Load configurations
+from helpers.config_helpers import load_pipeline_config, load_nlp_config
+
+# Get pipeline settings
+config = load_pipeline_config()
+output_dir = config['io']['output_dir']
+
+# Get available mood categories
+from helpers.config_helpers import get_mood_categories
+moods = get_mood_categories()
+print(f"Available moods: {moods}")
+```
+
+### 4. Batch Processing
+
+Process multiple images at once:
+
+```python
+# See scripts/3b_final_image_caption_integration.ipynb for batch processing examples
+```
+
+## Model Usage Examples
+
+### Vision Model (U-GAT-IT)
+
+```python
+# Example usage in notebooks
+from helpers.config_helpers import load_vision_config
+config = load_vision_config()
+
+# Model paths are configured in configs/vision_config.yaml
+genA2B_path = config['paths']['genA2B_model']
+```
+
+### NLP Model (GPT-2)
+
+```python
+# Example caption generation
+from helpers.config_helpers import load_nlp_config, get_generation_params
+nlp_config = load_nlp_config()
+gen_params = get_generation_params()
+
+# Generation parameters are in configs/nlp_config.yaml
+max_length = gen_params['max_length']
+temperature = gen_params['temperature']
+```
+
+## Reproducing Outputs
+
+To reproduce the sample outputs in `assets/memes/`:
+
+1. Ensure all models are downloaded and configured
+2. Run the full pipeline: `scripts/3b_final_image_caption_integration.ipynb`  
+3. Input images from `assets/raw_humanface/` will be processed
+4. Generated memes will be saved to `assets/memes/`
+
+## Troubleshooting
+
+- **CUDA out of memory**: Reduce batch size in `configs/pipeline_config.yaml`
+- **Model files missing**: Run `python models/download_vision_models.py`
+- **Import errors**: Ensure all dependencies in `requirements.txt` are installed
+- **Path issues**: Use `helpers.config_helpers.ensure_directories_exist()` to create missing directories
 
 For detailed information about the models, see [`models/README.md`](models/README.md).
 

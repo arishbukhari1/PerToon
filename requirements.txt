@@ -4,6 +4,7 @@ accelerate
 datasets
 matplotlib
 pandas
+PyYAML
 requests
 seaborn
 sentence_transformers

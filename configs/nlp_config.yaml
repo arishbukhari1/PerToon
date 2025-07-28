@@ -1,0 +1,66 @@
+# GPT-2 NLP Model Configuration
+# Configuration for mood-based caption generation
+
+model:
+  name: "gpt2-mood-caption-v2"
+  model_path: "models/gpt2-mood-caption-v2/"
+  base_model: "gpt2"
+  
+# Model Parameters
+architecture:
+  vocab_size: 50257
+  n_ctx: 1024
+  n_embd: 768
+  n_head: 12
+  n_layer: 12
+  n_positions: 1024
+
+# Generation Parameters
+generation:
+  max_length: 50
+  max_new_tokens: 40
+  do_sample: true
+  temperature: 0.8
+  top_k: 50
+  top_p: 0.9
+  num_return_sequences: 1
+  pad_token_id: 50256
+  eos_token_id: 50256
+
+# Training Parameters (for reference)
+training:
+  epochs: 3
+  batch_size: 4
+  learning_rate: 5e-5
+  weight_decay: 0.01
+  gradient_accumulation_steps: 2
+  max_grad_norm: 1.0
+  fp16: true
+  dataloader_drop_last: true
+
+# Data Processing
+data:
+  dataset_path: "data/mood_captions_goemotions.csv"
+  text_column: "text"
+  label_column: "emotions"
+  max_sequence_length: 128
+  
+# Mood Categories
+moods:
+  - "happy"
+  - "sad" 
+  - "angry"
+  - "funny"
+  - "sarcastic"
+  - "excited"
+  - "confused"
+  - "neutral"
+
+# Paths
+paths:
+  model_dir: "models/gpt2-mood-caption-v2/"
+  output_dir: "outputs/captions/"
+  
+# Device Configuration  
+device:
+  use_cuda: true 
