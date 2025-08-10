@@ -1,7 +1,55 @@
-from transformers import pipeline
+from transformers import pipeline, GPT2LMHeadModel, GPT2Tokenizer
 from textblob import TextBlob
+import re
+import os
 
-def generate_meme_caption(mood, generator, model_type="fine_tuned", max_length=40, temperature=0.95, num_return_sequences=1, diversity_mode="high"):
+def load_fine_tuned_model(model_path=None, project_root=None, model_name="gpt2-mood-caption-v2", dataset_name=None):
+    """
+    Load a fine-tuned GPT-2 model with path flexibility for different environments.
+    
+    Args:
+        model_path (str, optional): Direct path to the model. If None, constructs from project_root
+        project_root (str, optional): Root path of the project. If None, uses "../" for local runs
+        model_name (str): Name of the model directory
+        dataset_name (str, optional): Dataset name for unified model naming (goemotions/imgflip)
+        
+    Returns:
+        pipeline: Text generation pipeline with the loaded model
+    """
+    # Set default paths based on environment
+    if project_root is None:
+        project_root = ".."  # Default for local environment
+    
+    if model_path is None:
+        # Support unified dataset-specific model names
+        if dataset_name:
+            model_path = f"{project_root}/models/gpt2-mood-caption-{dataset_name}-v1"
+        else:
+            model_path = f"{project_root}/models/{model_name}"
+    
+    # Check if model exists
+    if not os.path.exists(model_path):
+        print(f"  Model not found at {model_path}")
+        print("Falling back to baseline GPT-2 model...")
+        return pipeline("text-generation", model="gpt2", tokenizer="gpt2")
+    
+    try:
+        # Load the fine-tuned model
+        print(f" Loading fine-tuned model from: {model_path}")
+        model = GPT2LMHeadModel.from_pretrained(model_path)
+        tokenizer = GPT2Tokenizer.from_pretrained(model_path)
+        
+        # Create pipeline
+        generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
+        print(f" Successfully loaded fine-tuned model!")
+        return generator
+        
+    except Exception as e:
+        print(f" Error loading fine-tuned model: {e}")
+        print("Falling back to baseline GPT-2 model...")
+        return pipeline("text-generation", model="gpt2", tokenizer="gpt2")
+
+def generate_meme_caption(mood, generator, model_type="fine_tuned", max_length=40, temperature=0.95, num_return_sequences=1, diversity_mode="high", project_root=None):
     """
     Generate a meme caption for a given mood using the specified model.
     
@@ -13,6 +61,7 @@ def generate_meme_caption(mood, generator, model_type="fine_tuned", max_length=4
         temperature (float): Sampling temperature (higher = more creative)
         num_return_sequences (int): Number of captions to generate
         diversity_mode (str): 'high', 'medium', or 'low' - controls diversity parameters
+        project_root (str, optional): Root path of the project for file operations
         
     Returns:
         dict: Generated caption with metadata
@@ -400,3 +449,99 @@ def display_diversity_comparison(mood, generator, model_type="fine_tuned"):
     print(f"Average bottom text length: {diversity_metrics['avg_bottom_word_length']:.1f} words")
     
     return diverse_captions, diversity_metrics
+
+def intelligent_meme_parser(generated_text, mood=None):
+    """
+    Intelligently parse complete model output into TOP/BOTTOM meme format.
+    
+    This replaces brittle early splitting with intelligent post-processing
+    that can handle complete, coherent thoughts from the model.
+    
+    Args:
+        generated_text (str): Complete output from the fine-tuned model
+        mood (str, optional): Original mood for context
+        
+    Returns:
+        dict: Parsed meme with 'top', 'bottom', and metadata
+    """
+    # Clean the generated text
+    text = generated_text.strip()
+    
+    # Remove any prompt artifacts
+    if mood and f"Generate a {mood}" in text:
+        text = re.sub(rf"Generate a {mood} meme caption:?\s*", "", text, flags=re.IGNORECASE)
+    
+    # Remove endoftext token if present
+    text = text.replace("<|endoftext|>", "").strip()
+    
+    # Look for existing TOP/BOTTOM structure first
+    top_match = re.search(r"TOP:\s*(.+?)(?:\s*BOTTOM:|$)", text, re.IGNORECASE | re.DOTALL)
+    bottom_match = re.search(r"BOTTOM:\s*(.+?)$", text, re.IGNORECASE | re.DOTALL)
+    
+    if top_match:
+        # Model already generated TOP/BOTTOM format
+        top_text = top_match.group(1).strip()
+        bottom_text = bottom_match.group(1).strip() if bottom_match else ""
+    else:
+        # Intelligently split coherent text into TOP/BOTTOM
+        words = text.split()
+        
+        if len(words) <= 6:
+            # Short text - use as TOP only
+            top_text = text
+            bottom_text = ""
+        else:
+            # Find natural break points for longer text
+            sentence_breaks = []
+            comma_breaks = []
+            connector_breaks = []
+            
+            for i, word in enumerate(words):
+                if word.endswith(('.', '!', '?')):
+                    sentence_breaks.append(i + 1)
+                elif word.endswith(','):
+                    comma_breaks.append(i + 1)
+                elif word.lower() in ['when', 'because', 'but', 'and', 'so', 'then', 'if']:
+                    connector_breaks.append(i)
+            
+            # Choose best break point
+            target_split = len(words) // 2
+            
+            # Prefer sentence breaks near the middle
+            best_break = target_split
+            if sentence_breaks:
+                best_break = min(sentence_breaks, key=lambda x: abs(x - target_split))
+            elif connector_breaks:
+                best_break = min(connector_breaks, key=lambda x: abs(x - target_split))
+            elif comma_breaks:
+                best_break = min(comma_breaks, key=lambda x: abs(x - target_split))
+            
+            # Ensure reasonable split (not too unbalanced)
+            if best_break < len(words) * 0.2:
+                best_break = int(len(words) * 0.4)
+            elif best_break > len(words) * 0.8:
+                best_break = int(len(words) * 0.6)
+            
+            top_text = ' '.join(words[:best_break]).strip()
+            bottom_text = ' '.join(words[best_break:]).strip()
+    
+    # Clean and format the text parts
+    top_text = top_text.strip('.,!?').strip().upper()
+    bottom_text = bottom_text.strip('.,!?').strip().upper()
+    
+    # Ensure reasonable length limits
+    if len(top_text.split()) > 8:
+        top_words = top_text.split()[:8]
+        top_text = ' '.join(top_words)
+    
+    if len(bottom_text.split()) > 8:
+        bottom_words = bottom_text.split()[:8]
+        bottom_text = ' '.join(bottom_words)
+    
+    return {
+        'top': top_text,
+        'bottom': bottom_text,
+        'original_text': generated_text,
+        'parsing_method': 'existing_format' if top_match else 'intelligent_split',
+        'mood': mood
+    }
