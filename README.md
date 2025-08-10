@@ -2,7 +2,7 @@
  
 Project By 
 #
-**Paolo Ferrara**|ferrara.pao@northeastern.edu , **Muhammad Arish Salam Bukhari** | bukhari.mu@northeastern.edu, **Shan Lin** | lin.shan1@northeastern.edu, **Patricia Atkinson** | atkinson.p@northeastern.edu 
+**Paolo Ferrara**|ferrara.pao@northeastern.edu , **Muhammad Arish Salam Bukhari** | bukhari.mu@northeastern.edu, **Shan Lin** | lin.shan1@northeastern.edu 
 
 **May 30th, 2025**
 
@@ -24,40 +24,40 @@ While both cartoonization and text generation are independently well-studied, th
 
 ```
 PerToon/
-├── configs/                           # Configuration files for model parameters
-├── scripts/                           # Main pipeline implementation (Jupyter notebooks)
-│   ├── 1a_image_acquisition.ipynb    # Dataset collection and initial processing
-│   ├── 1b_image_processing.ipynb     # Image preprocessing and augmentation
-│   ├── 2a_nlp_model_setup.ipynb      # GPT-2 model fine-tuning setup
-│   ├── 2b_caption_generation.ipynb   # Caption generation and testing
-│   ├── 2c_nlp_imgflip_model_setup.ipynb # Alternative model setup for meme templates
-│   ├── 3a_meme_text_rendering.ipynb  # Text overlay and meme composition
+├── assets/           # Input and output image directories
+│   ├── raw_humanface/   # Input human face images
+│   └── memes/           # Generated cartoon memes (output)
+├── configs/          # YAML configuration files
+├── data/             # Datasets and preprocessed data
+├── docs/             # Project documentation
+├── figures/          # Figures and result visualizations
+├── helpers/          # Utility functions and shared logic
+├── models/           # Model assets (vision and NLP)
+│   ├── gpt2-base-goemotions/      # Fine-tuned GPT-2 (GoEmotions, base)
+│   └── gpt2-medium-goemotions/    # Fine-tuned GPT-2 (GoEmotions, medium)
+├── scripts/          # Main pipeline implementation (Jupyter notebooks)
+│   ├── 1a_image_acquisition.ipynb         # Dataset collection and initial processing
+│   ├── 1b_image_processing.ipynb          # Image preprocessing and augmentation
+│   ├── 2a_nlp_model_setup.ipynb           # GPT-2 model fine-tuning setup
+│   ├── 2b_caption_generation.ipynb        # Caption generation and testing
+│   ├── 2c_nlp_imgflip_model_setup.ipynb   # Alternative model setup for meme templates
+│   ├── 3a_meme_text_rendering.ipynb       # Text overlay and meme composition
 │   └── 3b_final_image_caption_integration.ipynb # Complete end-to-end pipeline
-│
-├── helpers/                           # Utility functions and shared logic
-├── models/                            # Model assets and download utilities
-│   ├── gpt2-mood-caption-v2/          # Fine-tuned GPT-2 model
-│   └── download_vision_models.py     # Script to download U-GAT-IT models
-│
-├── data/                              # Datasets and preprocessed data
-├── assets/                            # Input and output image directories
-│   ├── raw_humanface/                 # Input human face images (1000+ samples)
-│   └── memes/                         # Generated cartoon memes (output)
-│
-├── docs/                              # Project documentation
-├── Dockerfile                         # Docker containerization
-├── requirements.txt                   # Python dependencies
-└── README.md                          # Project overview and setup guide
+├── Dockerfile        # Docker containerization
+├── requirements.txt  # Python dependencies
+├── LICENSE           # License file
+└── README.md         # Project overview and setup guide
 ```
 
 ## Key Components
 
 - **Main Pipeline**: `scripts/3b_final_image_caption_integration.ipynb` - Complete end-to-end execution
 - **Vision Model**: U-GAT-IT for photo-to-cartoon transformation  
-- **Language Model**: Fine-tuned GPT-2 for mood-based caption generation
+- **Language Model**: Fine-tuned GPT-2 for mood-based caption generation (supports multiple datasets)
+- **Unified Dataset Strategy**: Switch between GoEmotions and ImgFlip datasets seamlessly
 - **Configuration**: YAML files in `configs/` for easy parameter adjustment
 - **Docker Support**: Complete containerization for reproducible deployment
-- **Dataset**: 1000+ face images + emotion-labeled captions
+- **Dataset**: 1000+ face images + emotion-labeled captions from multiple sources
 
 # Setup and Installation
 
@@ -106,18 +106,21 @@ docker run -it --gpus all -v $(pwd):/app -p 8080:8080 pertoon jupyter notebook -
    ```
 
 4. **Download required model files:**
-   
-   The project requires two pre-trained model files (~1.1GB each) that are too large to include in the repository:
-   
+
+   The project requires several pre-trained model files that are too large to include in the repository:
+
    ```bash
-   # Automatic download (recommended)
+   # Download vision models (cartoonization)
    python models/download_vision_models.py
+
+   # Download NLP model weights (caption generation)
+   python models/download_nlp_models.py
    ```
-   
+
    **Manual download (alternative):**
-   - Download `genA2B_final.pth` from [Google Drive](https://drive.google.com/file/d/15bSGDiqQhLXh35eSUvJNdymakHrzeZ5c/view?usp=sharing)
-   - Download `genB2A_final.pth` from [Google Drive](https://drive.google.com/file/d/12NpKowJwEDIE1wqtPqCdPEMcLoJGzHeQ/view?usp=sharing)
-   - Place both files in the `models/` directory
+   - Vision models: See links in `models/README_vision.md`
+   - NLP models: See links in `models/README_nlp.md`
+   - Place files in the appropriate subdirectories as described in those READMEs.
 
 5. **Verify installation:**
    ```bash
@@ -162,8 +165,9 @@ For understanding each component:
 jupyter notebook scripts/1a_image_acquisition.ipynb
 jupyter notebook scripts/1b_image_processing.ipynb
 
-# 2. Model setup and fine-tuning
-jupyter notebook scripts/2a_nlp_model_setup.ipynb
+# 2. Model setup and fine-tuning (choose your dataset)
+jupyter notebook scripts/2a_nlp_model_setup.ipynb      # GoEmotions focused (supports both)
+jupyter notebook scripts/2c_nlp_imgflip_model_setup.ipynb  # ImgFlip focused (supports both)  
 jupyter notebook scripts/2b_caption_generation.ipynb
 
 # 3. Meme generation and integration
@@ -233,11 +237,11 @@ To reproduce the sample outputs in `assets/memes/`:
 ## Troubleshooting
 
 - **CUDA out of memory**: Reduce batch size in `configs/pipeline_config.yaml`
-- **Model files missing**: Run `python models/download_vision_models.py`
+- **Model files missing**: Run `python models/download_vision_models.py` and/or `python models/download_nlp_models.py`
 - **Import errors**: Ensure all dependencies in `requirements.txt` are installed
 - **Path issues**: Use `helpers.config_helpers.ensure_directories_exist()` to create missing directories
 
-For detailed information about the models, see [`models/README.md`](models/README.md).
+For detailed information about the models, see [`models/README_vision.md`](models/README_vision.md) and [`models/README_nlp.md`](models/README_nlp.md).
 
 # 2. Problem Statement 
 
