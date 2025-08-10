@@ -202,10 +202,46 @@ cython_debug/
 
 # ML Training Artifacts (checkpoints, logs, cache)
 # Checkpoints are large intermediate training states - not for version control
-models/*/checkpoints/
-**/checkpoints/
 checkpoint-*/
-*.ckpt
+models/*/checkpoint-*/
+
+# Ignore large training artifacts in checkpoints
+checkpoint-*/optimizer.pt
+checkpoint-*/scheduler.pt
+checkpoint-*/scaler.pt
+checkpoint-*/rng_state.pth
+checkpoint-*/trainer_state.json
+checkpoint-*/training_args.bin
+models/*/checkpoint-*/optimizer.pt
+models/*/checkpoint-*/scheduler.pt
+models/*/checkpoint-*/scaler.pt
+models/*/checkpoint-*/rng_state.pth
+models/*/checkpoint-*/trainer_state.json
+models/*/checkpoint-*/training_args.bin
+
+# Ignore large model files by default, but allow main inference weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+!model.safetensors
+!pytorch_model.bin
+!models/*/model.safetensors
+!models/*/pytorch_model.bin
+
+# Allow config and tokenizer files
+!config.json
+!generation_config.json
+!merges.txt
+!special_tokens_map.json
+!tokenizer_config.json
+!vocab.json
+!models/*/config.json
+!models/*/generation_config.json
+!models/*/merges.txt
+!models/*/special_tokens_map.json
+!models/*/tokenizer_config.json
+!models/*/vocab.json
 
 # HuggingFace Cache
 .cache/
