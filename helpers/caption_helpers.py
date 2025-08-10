@@ -545,3 +545,188 @@ def intelligent_meme_parser(generated_text, mood=None):
         'parsing_method': 'existing_format' if top_match else 'intelligent_split',
         'mood': mood
     }
+
+def fine_tune_gpt2_enhanced(tokenized_dataset, tokenizer, output_dir,
+                           epochs=3, batch_size=4, learning_rate=2e-5, 
+                           resume_from_checkpoint=None, model_size="base"):
+    """
+    Enhanced fine-tune GPT-2 model for mood-conditioned caption generation with comprehensive metrics.
+    """
+    import torch
+    import os
+    import math
+    from transformers import (GPT2LMHeadModel, Trainer, TrainingArguments, 
+                             DataCollatorForLanguageModeling, EarlyStoppingCallback)
+    
+    print(f"Starting GPT-2 Fine-Tuning ({model_size} model)...")
+
+    # Load appropriate GPT-2 model based on size
+    if model_size == "medium":
+        model_name = "gpt2-medium"
+        print("Loading GPT-2 Medium model (345M parameters)")
+        if torch.cuda.is_available():
+            batch_size = max(1, batch_size // 2)
+            print(f"Adjusted batch size to {batch_size} for GPT-2 Medium")
+    else:
+        model_name = "gpt2"
+        print("Loading GPT-2 Base model (117M parameters)")
+
+    model = GPT2LMHeadModel.from_pretrained(model_name)
+    print(f"Loaded {model_name} model")
+
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+    eval_dataset = None
+    if len(tokenized_dataset) > 5000:
+        eval_size = len(tokenized_dataset) // 10
+        train_size = len(tokenized_dataset) - eval_size
+        train_dataset, eval_dataset = torch.utils.data.random_split(
+            tokenized_dataset, [train_size, eval_size], generator=torch.Generator().manual_seed(42)
+        )
+        print(f"Created validation split: {train_size} train, {eval_size} validation")
+    else:
+        train_dataset = tokenized_dataset
+        print("Dataset too small for validation split, using full dataset for training")
+
+    def compute_metrics(eval_pred):
+        import numpy as np
+        predictions, labels = eval_pred
+        shift_logits = predictions[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        from torch.nn.functional import cross_entropy
+        loss = cross_entropy(shift_logits.view(-1, shift_logits.size(-1)),
+                           shift_labels.view(-1), ignore_index=-100, reduction='mean')
+        perplexity = torch.exp(loss).item()
+        return {
+            "perplexity": perplexity,
+            "eval_loss": loss.item()
+        }
+
+    # Enhanced Training arguments with comprehensive metrics monitoring
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        report_to="none",
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=2,
+        prediction_loss_only=True,
+        num_train_epochs=epochs,
+        learning_rate=learning_rate,
+        warmup_steps=200,
+        lr_scheduler_type="cosine",
+        save_steps=500,
+        save_total_limit=5,
+        logging_steps=50,
+        eval_strategy="steps" if eval_dataset else "no",
+        eval_steps=500 if eval_dataset else None,
+        load_best_model_at_end=True if eval_dataset else False,
+        metric_for_best_model="eval_loss" if eval_dataset else None,
+        greater_is_better=False,
+        weight_decay=0.01,
+        fp16=torch.cuda.is_available(),
+        dataloader_drop_last=True,
+        gradient_accumulation_steps=2,
+        adam_epsilon=1e-8,
+        max_grad_norm=1.0,
+        logging_dir=f"{output_dir}/logs",
+        logging_first_step=True,
+        run_name=f"gpt2-{model_size}-mood-captions",
+        log_level="info",
+        logging_strategy="steps",
+        save_strategy="steps",
+    )
+
+    callbacks = []
+    if eval_dataset:
+        try:
+            early_stopping = EarlyStoppingCallback(
+                early_stopping_patience=3,
+                early_stopping_threshold=0.001
+            )
+            callbacks.append(early_stopping)
+            print("Added early stopping callback with patience=3")
+        except ImportError:
+            print("EarlyStoppingCallback not available, continuing without early stopping")
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics if eval_dataset else None,
+        callbacks=callbacks,
+    )
+
+    print(f"Enhanced Training Configuration:")
+    print(f"   Dataset size: {len(tokenized_dataset)} examples")
+    print(f"   Validation split: {'Yes' if eval_dataset else 'No'}")
+    print(f"   Epochs: {epochs}")
+    print(f"   Batch size: {batch_size}")
+    print(f"   Learning rate: {learning_rate}")
+    print(f"   Metrics: Loss{'+ Early Stopping' if eval_dataset else ''}")
+    print(f"   Output directory: {output_dir}")
+    print(f"   Using GPU: {torch.cuda.is_available()}")
+    print(f"   Resume from checkpoint: {resume_from_checkpoint if resume_from_checkpoint else 'Starting fresh'}")
+
+    print(f"\nStarting enhanced training with metrics monitoring...")
+    print(f"Training will log: Step, Training Loss, Validation Loss, Learning Rate")
+    trainer.train(resume_from_checkpoint=resume_from_checkpoint)
+
+    os.makedirs(output_dir, exist_ok=True)
+    trainer.save_model(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+    if eval_dataset:
+        eval_metrics = trainer.evaluate()
+        eval_loss = eval_metrics["eval_loss"]
+        print(f"Perplexity (from final eval_loss): {math.exp(eval_loss):.4f}")
+
+    if hasattr(trainer.state, 'log_history') and trainer.state.log_history:
+        final_metrics = trainer.state.log_history[-1]
+        print(f"\nTraining Complete! Final Metrics:")
+
+        train_loss = final_metrics.get('train_loss', 'N/A')
+        if isinstance(train_loss, (int, float)):
+            print(f"   Final Loss: {train_loss:.4f}")
+        else:
+            print(f"   Final Loss: {train_loss}")
+
+        if 'eval_loss' in final_metrics:
+            eval_loss = final_metrics.get('eval_loss')
+            if isinstance(eval_loss, (int, float)):
+                print(f"   Final Validation Loss: {eval_loss:.4f}")
+            else:
+                print(f"   Final Validation Loss: {eval_loss}")
+
+        print(f"   Total Steps: {trainer.state.global_step}")
+
+    print(f"\nModel saved to {output_dir}")
+    print(f"Training logs available at {output_dir}/logs")
+    return trainer
+
+def get_checkpoint_or_none(output_dir, subdirectory="checkpoints"):
+    """
+    Get checkpoint or None with consistent logging.
+    """
+    import os
+    
+    if not os.path.exists(output_dir):
+        print("No output directory found, cannot search for checkpoints.")
+        return None
+
+    # List all entries in the output directory that start with 'checkpoint-' and are directories
+    checkpoint_files = [f for f in os.listdir(output_dir)
+                        if f.startswith('checkpoint-') and os.path.isdir(os.path.join(output_dir, f))]
+
+    if not checkpoint_files:
+        print("No existing checkpoints found — starting from scratch.")
+        return None
+
+    # Sort by checkpoint number to find the latest one
+    checkpoint_files.sort(key=lambda x: int(x.split('-')[1]))
+    latest_checkpoint = os.path.join(output_dir, checkpoint_files[-1])
+
+    print(f"Resuming training from checkpoint: {latest_checkpoint}")
+    return latest_checkpoint
+

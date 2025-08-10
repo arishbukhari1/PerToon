@@ -1,14 +1,16 @@
 """
 Unified Dataset Factory for PerToon Project
-===========================================
+=============================================================================
 
-This module provides a unified interface for loading and processing different datasets
-(GoEmotions, ImgFlip, etc.) with the same pipeline while handling their specific requirements.
+This module provides a unified interface for loading and processing datasets.
+It now fully encapsulates the ImgFlip pipeline, from download to sampling to labeling,
+with configurable file paths for robust caching at each step.
 
 Key Features:
 - Handles pre-labeled (GoEmotions) and unlabeled (ImgFlip) datasets
 - Unified pipeline: Load → Label → EDA → Balance → Format → Tokenize
-- Configuration-driven dataset switching
+- Configuration-driven dataset switching with configurable paths
+- Robust caching at each stage (raw, sampled, labeled)
 - Reusable across 2a, 2c, and future notebooks
 """
 
@@ -35,34 +37,33 @@ EMOTION_LABELS = [
 class DatasetConfig:
     """Configuration class for different datasets."""
     
-    def __init__(self, 
-                 dataset_name: str,
-                 has_labels: bool,
-                 loader_function: str,
-                 labeler_model: Optional[str] = None,
-                 save_path: Optional[str] = None,
-                 **kwargs):
+    def __init__(self, dataset_name: str, has_labels: bool, loader_function: str, **kwargs):
         self.dataset_name = dataset_name
         self.has_labels = has_labels
         self.loader_function = loader_function
-        self.labeler_model = labeler_model
-        self.save_path = save_path
         self.kwargs = kwargs
+        # Set attributes from kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
-# Dataset configurations
+# --- NEW: Dataset configurations with configurable paths ---
 DATASET_CONFIGS = {
     "goemotions": DatasetConfig(
         dataset_name="goemotions",
         has_labels=True,
         loader_function="load_goemotions",
-        save_path="mood_captions_goemotions.csv"
+        labeled_path="mood_captions_goemotions.csv"
     ),
     "imgflip": DatasetConfig(
         dataset_name="imgflip", 
         has_labels=False,
         loader_function="load_imgflip",
         labeler_model="facebook/bart-large-mnli",
-        save_path="mood_captions_imgflip.csv",
+        # Default paths for the full dataset processing
+        raw_path="captions_imgflip.csv",
+        sampled_path="captions_imgflip_full_sample.csv",
+        labeled_path="mood_captions_imgflip.csv",
+        # Default processing parameters
         captions_to_process=200000,
         batch_size=100
     )
@@ -91,7 +92,7 @@ class UnifiedDatasetFactory:
         
         Args:
             dataset_name (str): Name of dataset ("goemotions" or "imgflip")
-            **override_kwargs: Override default configuration parameters
+            **override_kwargs: Override default configuration parameters (including file paths)
             
         Returns:
             pd.DataFrame: Processed dataframe with 'mood' and 'caption' columns
@@ -101,12 +102,12 @@ class UnifiedDatasetFactory:
             
         config = DATASET_CONFIGS[dataset_name]
         
-        # Override config with any provided kwargs
+        # Override config with any provided kwargs (including file paths)
         for key, value in override_kwargs.items():
-            setattr(config, key, value)
+            if value is not None:
+                setattr(config, key, value)
             
-        print(f" Loading {config.dataset_name} dataset...")
-        print(f"   Pre-labeled: {'Yes' if config.has_labels else 'No (will apply zero-shot labeling)'}")
+        print(f"Loading {config.dataset_name} dataset...")
         
         # Call the appropriate loader function
         loader_method = getattr(self, config.loader_function)
@@ -114,13 +115,8 @@ class UnifiedDatasetFactory:
         
         # Ensure output format consistency
         if 'mood' not in df.columns or 'caption' not in df.columns:
-            raise ValueError(f"Dataset loader must return DataFrame with 'mood' and 'caption' columns")
+            raise ValueError("Loader must return DataFrame with 'mood' and 'caption' columns.")
             
-        # Save processed data
-        save_path = f"{self.data_dir}/{config.save_path}"
-        df.to_csv(save_path, index=False)
-        print(f" Saved processed data to {save_path}")
-        
         return df
     
     def load_goemotions(self, config: DatasetConfig) -> pd.DataFrame:
@@ -158,44 +154,71 @@ class UnifiedDatasetFactory:
         print(f"    GoEmotions processed: {len(final_df)} samples with {final_df['mood'].nunique()} emotions")
         return final_df
     
+    # --- HEAVILY REFACTORED: This function now contains the full pipeline logic ---
     def load_imgflip(self, config: DatasetConfig) -> pd.DataFrame:
         """
-        Load ImgFlip dataset (unlabeled) and apply zero-shot emotion labeling.
-        
-        Args:
-            config (DatasetConfig): Dataset configuration
-            
-        Returns:
-            pd.DataFrame: Processed dataframe with mood and caption columns
+        Orchestrates the loading of the ImgFlip dataset, using cached files at each stage.
         """
-        print("    Loading ImgFlip captions...")
-        
-        # Step 1: Download captions if not exists
-        captions_path = f"{self.data_dir}/captions_imgflip.csv"
-        if not os.path.exists(captions_path):
-            print("    Downloading captions from ImgFlip GitHub...")
-            captions_df = self._download_imgflip_captions(captions_path)
+        # Define full paths from config
+        labeled_path = os.path.join(self.data_dir, config.labeled_path)
+        sampled_path = os.path.join(self.data_dir, config.sampled_path)
+        raw_path = os.path.join(self.data_dir, config.raw_path)
+
+        # 1. Check for the final, labeled file
+        if os.path.exists(labeled_path):
+            print(f"    Found pre-labeled data. Loading from: {labeled_path}")
+            df = pd.read_csv(labeled_path)
+            if 'predicted_emotion' in df.columns:
+                df = df.rename(columns={'predicted_emotion': 'mood'})
+            return df[['mood', 'caption']]
+
+        # 2. If no labeled file, check for a sampled (but unlabeled) file
+        if os.path.exists(sampled_path):
+            print(f"    Found pre-sampled data. Loading from: {sampled_path}")
+            sampled_df = pd.read_csv(sampled_path)
         else:
-            print(f"    Loading existing captions from {captions_path}")
-            captions_df = pd.read_csv(captions_path)
+            # 3. If no sampled file, get raw captions (download if needed)
+            if os.path.exists(raw_path):
+                print(f"    Found raw captions. Loading from: {raw_path}")
+                raw_df = pd.read_csv(raw_path)
+                if 'caption' not in raw_df.columns and raw_df.shape[1] == 1:
+                    raw_df.columns = ['caption']
+            else:
+                print("    No raw captions found. Downloading from GitHub...")
+                raw_df = self._download_imgflip_captions(raw_path)
+            
+            # 4. Sample the raw captions
+            print(f"    Sampling {config.captions_to_process} captions...")
+            sampled_df = self._sample_captions(raw_df, config.captions_to_process, sampled_path)
         
-        print(f"    ImgFlip captions loaded: {len(captions_df)} samples")
-        
-        # Step 2: Apply zero-shot emotion labeling
+        # 5. Label the sampled captions
         print("    Applying zero-shot emotion labeling...")
         labeled_df = self._apply_emotion_labeling(
-            captions_df, 
+            sampled_df,
+            labeled_path,
             config.labeler_model,
-            captions_to_process=getattr(config, 'captions_to_process', 200000),
-            batch_size=getattr(config, 'batch_size', 100)
+            config.batch_size
         )
-        
-        print(f"    ImgFlip processed: {len(labeled_df)} samples with {labeled_df['mood'].nunique()} emotions")
+
+        print(f"    ImgFlip processing complete: {len(labeled_df)} samples with {labeled_df['mood'].nunique()} emotions.")
         return labeled_df
     
     def _download_imgflip_captions(self, save_path: str) -> pd.DataFrame:
         """Download ImgFlip captions from GitHub repository."""
         
+        # If file already exists, don't re-download
+        if os.path.exists(save_path):
+            print(f"       Loading existing captions from {save_path}")
+            try:
+                df = pd.read_csv(save_path)
+                if 'caption' not in df.columns and df.shape[1] == 1:
+                    df.columns = ['caption']
+                print(f"       Loaded {len(df)} captions from existing file")
+                return df
+            except Exception as e:
+                print(f"       Error reading existing file: {e}, downloading from GitHub...")
+        
+        # Download from GitHub
         api_url = "https://api.github.com/repos/schesa/ImgFlip575K_Dataset/contents/dataset/memes"
         
         try:
@@ -204,103 +227,75 @@ class UnifiedDatasetFactory:
             files = response.json()
             
             all_captions = []
+            print(f"       Downloading from GitHub repo...")
             
-            for file_info in files[:10]:  # Limit for testing
+            for file_info in files:
                 if file_info['name'].endswith('.json'):
-                    print(f"       Processing {file_info['name']}...")
+                    print(f"         Processing {file_info['name']}...")
                     
                     file_response = requests.get(file_info['download_url'])
                     file_response.raise_for_status()
+                    data = file_response.json()
                     
-                    memes = json.loads(file_response.text)
+                    # Handle both single objects and lists
+                    if not isinstance(data, list):
+                        data = [data]
                     
-                    for meme in memes[:100]:  # Limit per file for testing
-                        if 'text' in meme and meme['text']:
-                            # Handle both single strings and lists
-                            if isinstance(meme['text'], list):
-                                caption = ' '.join(meme['text'])
-                            else:
-                                caption = meme['text']
-                            
-                            all_captions.append(caption)
+                    for meme in data:
+                        boxes = meme.get('boxes', [])
+                        if boxes:
+                            all_captions.append(' '.join(boxes))
             
             captions_df = pd.DataFrame({'caption': all_captions})
             captions_df.to_csv(save_path, index=False)
-            
+            print(f"       Saved {len(captions_df)} raw captions to {save_path}")
             return captions_df
             
         except Exception as e:
-            print(f" Error downloading ImgFlip data: {e}")
-            # Return empty dataframe as fallback
+            print(f"       Error downloading ImgFlip data: {e}")
             return pd.DataFrame({'caption': []})
     
-    def _apply_emotion_labeling(self, 
-                              captions_df: pd.DataFrame, 
-                              model_name: str,
-                              captions_to_process: int = 200000,
-                              batch_size: int = 100) -> pd.DataFrame:
-        """Apply zero-shot emotion labeling to captions."""
+    # --- NEW: This method encapsulates the sampling logic from the notebook ---
+    def _sample_captions(self, df: pd.DataFrame, num_to_sample: int, save_path: str) -> pd.DataFrame:
+        """Samples captions from a DataFrame and saves them to a CSV."""
+        shuffled_df = df.dropna(subset=['caption']).sample(frac=1, random_state=42)
+        sampled_df = shuffled_df.head(num_to_sample)[['caption']].reset_index(drop=True)
+        sampled_df.to_csv(save_path, index=False)
+        print(f"       Saved {len(sampled_df)} sampled captions to {save_path}")
+        return sampled_df
+    
+    # --- MODIFIED: Accepts the DataFrame to label and the output path ---
+    def _apply_emotion_labeling(self, df_to_label: pd.DataFrame, save_path: str, model_name: str, batch_size: int) -> pd.DataFrame:
+        """Applies zero-shot emotion labeling and saves the result."""
+        device = 0 if torch.cuda.is_available() else -1
+        classifier = pipeline("zero-shot-classification", model=model_name, device=device)
         
-        # Limit processing for efficiency
-        df_subset = captions_df.head(captions_to_process).copy()
+        print(f"       Processing {len(df_to_label)} captions in batches of {batch_size}...")
         
-        # Initialize zero-shot classifier
-        print(f"       Loading {model_name} for zero-shot classification...")
-        classifier = pipeline(
-            "zero-shot-classification",
-            model=model_name,
-            tokenizer=model_name,
-            device=0 if torch.cuda.is_available() else -1
-        )
-        
-        print(f"       Processing {len(df_subset)} captions in batches of {batch_size}...")
-        
-        labeled_data = []
-        
-        for i in range(0, len(df_subset), batch_size):
-            batch = df_subset.iloc[i:i+batch_size]
+        labeled_rows = []
+        from tqdm import tqdm
+        for i in tqdm(range(0, len(df_to_label), batch_size), desc="Labeling batches"):
+            batch = df_to_label.iloc[i:i+batch_size]['caption'].tolist()
+            results = classifier(batch, EMOTION_LABELS, multi_label=False)
             
-            for idx, row in batch.iterrows():
-                caption = row['caption']
+            if not isinstance(results, list):
+                results = [results]
                 
-                # Clean caption for classification
-                clean_caption = str(caption)[:500]  # Limit length for efficiency
-                
-                try:
-                    # Classify emotion
-                    result = classifier(clean_caption, EMOTION_LABELS)
-                    predicted_emotion = result['labels'][0]  # Top prediction
-                    confidence = result['scores'][0]
-                    
-                    labeled_data.append({
-                        'caption': caption,
-                        'mood': predicted_emotion,
-                        'confidence': confidence
-                    })
-                    
-                except Exception as e:
-                    # Fallback to neutral for problematic captions
-                    labeled_data.append({
-                        'caption': caption,
-                        'mood': 'neutral',
-                        'confidence': 0.0
-                    })
-            
-            if (i // batch_size + 1) % 10 == 0:
-                print(f"         Processed {i + len(batch)}/{len(df_subset)} captions...")
+            for j, res in enumerate(results):
+                labeled_rows.append({
+                    "caption": batch[j], 
+                    "mood": res['labels'][0], 
+                    "confidence": res['scores'][0]
+                })
         
-        result_df = pd.DataFrame(labeled_data)
+        labeled_df = pd.DataFrame(labeled_rows)
+        # Filter by confidence and select columns
+        labeled_df = labeled_df[labeled_df['confidence'] >= 0.3][['mood','caption']]
         
-        # Filter out low-confidence predictions (optional)
-        confidence_threshold = 0.3
-        high_confidence_df = result_df[result_df['confidence'] >= confidence_threshold].copy()
-        
-        print(f"       Emotion labeling complete!")
-        print(f"         Total labeled: {len(result_df)}")
-        print(f"         High confidence (>{confidence_threshold}): {len(high_confidence_df)}")
-        
-        # Return only mood and caption columns for consistency
-        return high_confidence_df[['mood', 'caption']].copy()
+        # Save the final labeled data
+        labeled_df.to_csv(save_path, index=False)
+        print(f"       Saved {len(labeled_df)} labeled captions to {save_path}")
+        return labeled_df
     
     def perform_eda_analysis(self, df: pd.DataFrame, dataset_name: str = "dataset") -> Tuple:
         """
@@ -629,6 +624,84 @@ class UnifiedDatasetFactory:
         print(f" Tokenized {len(tokenized_dataset)} examples")
         
         return tokenized_dataset, tokenizer
+    
+    def train_multiple_models(self,
+                            df: pd.DataFrame,
+                            model_sizes: List[str] = ["base", "medium"],
+                            output_base_dir: str = None,
+                            dataset_name: str = "dataset",
+                            epochs: int = 3,
+                            **training_kwargs) -> Dict:
+        """
+        Train multiple model sizes with the same dataset for comparison.
+        
+        Args:
+            df (pd.DataFrame): Balanced dataset
+            model_sizes (List[str]): List of model sizes to train ("base", "medium")
+            output_base_dir (str): Base directory for model outputs
+            dataset_name (str): Dataset name for model naming
+            epochs (int): Training epochs
+            **training_kwargs: Additional training arguments
+            
+        Returns:
+            Dict: Results from training multiple models
+        """
+        print(f"\n TRAINING MULTIPLE MODEL SIZES")
+        print("=" * 60)
+        
+        if output_base_dir is None:
+            output_base_dir = f"{self.project_root}/models"
+        
+        # Prepare dataset once
+        training_dataset = self.create_complete_meme_training_dataset(df)
+        tokenized_dataset, tokenizer = self.tokenize_dataset(training_dataset)
+        
+        results = {}
+        
+        for model_size in model_sizes:
+            print(f"\n Training GPT-2 {model_size.upper()} model...")
+            
+            # Create model-specific output directory
+            model_output_dir = f"{output_base_dir}/gpt2-{model_size}-{dataset_name}"
+            
+            try:
+                # Import training function from caption_helpers
+                from .caption_helpers import fine_tune_gpt2_enhanced
+                
+                trainer = fine_tune_gpt2_enhanced(
+                    tokenized_dataset=tokenized_dataset,
+                    tokenizer=tokenizer,
+                    output_dir=model_output_dir,
+                    model_size=model_size,
+                    epochs=epochs,
+                    **training_kwargs
+                )
+                
+                results[model_size] = {
+                    'trainer': trainer,
+                    'output_dir': model_output_dir,
+                    'status': 'completed'
+                }
+                
+                print(f" {model_size.upper()} model training completed!")
+                
+            except Exception as e:
+                print(f" {model_size.upper()} model training failed: {e}")
+                results[model_size] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+        
+        print(f"\n TRAINING SUMMARY")
+        print("=" * 40)
+        for size, result in results.items():
+            status = result['status']
+            if status == 'completed':
+                print(f"   {size.upper()}:  {result['output_dir']}")
+            else:
+                print(f"   {size.upper()}:  {result.get('error', 'Unknown error')}")
+        
+        return results
 
 
 # Convenience function for easy usage
@@ -659,5 +732,7 @@ if __name__ == "__main__":
     # print("Testing ImgFlip loading...")
     # imgflip_df = factory.load_dataset("imgflip", captions_to_process=1000)
     # factory.perform_eda_analysis(imgflip_df, "ImgFlip")
+
+
 
 
