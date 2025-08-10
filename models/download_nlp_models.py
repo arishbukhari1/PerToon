@@ -2,7 +2,13 @@
 """
 Download pre-trained NLP model weights for PerToon.
 
-This script downloads the required model.safetensors files for the gpt2-base-goemotions and gpt2-medium-goemotions models from Google Drive and places them in the appropriate subdirectories under models/.
+This script downloads the required model.safetensors files for:
+  - gpt2-base-goemotions
+  - gpt2-medium-goemotions
+  - gpt2-base-imgflip
+  - gpt2-medium-imgflip
+
+and places them in the appropriate subdirectories under models/.
 """
 
 import sys
@@ -11,7 +17,7 @@ from pathlib import Path
 try:
     import gdown
 except ImportError:
-    print("❌ Error: 'gdown' library not found.")
+    print("Error: 'gdown' library not found.")
     print("Please install it with: pip install gdown")
     sys.exit(1)
 
@@ -35,6 +41,24 @@ def main():
             "files": [
                 {"name": "model.safetensors", "file_id": "1CTMlPJ4MWSu7xxbX65hWb_TpD-U7GUIr"}
             ]
+        },
+        {
+            "dir": "gpt2-base-imgflip",
+            "files": [
+                {
+                    "name": "model.safetensors",
+                    "file_id": "1S27w8gKG9lP8e_a5tobQwzLdjzp_gv1t"
+                }
+            ]
+        },
+        {
+            "dir": "gpt2-medium-imgflip",
+            "files": [
+                {
+                    "name": "model.safetensors",
+                    "file_id": "1KeTPzHAfa0UtrwGafi1kxD5uU6bmIbRC"
+                }
+            ]
         }
     ]
 
@@ -49,7 +73,10 @@ def main():
             if file_path.exists():
                 print(f"{file_path} already exists - skipping")
                 continue
-            print(f"📥 Downloading {file_path}")
+            if not file.get("file_id"):
+                print(f"Missing file_id for {model['dir']}/{file['name']} - cannot download.")
+                return False
+            print(f"Downloading {file_path}")
             try:
                 download_file_from_google_drive(file["file_id"], file_path)
                 print(f"Successfully downloaded {file_path}")

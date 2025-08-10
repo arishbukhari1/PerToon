@@ -1,11 +1,13 @@
-# NLP Models for PerToon (GoEmotions GPT-2)
+# NLP Models for PerToon (GPT-2: GoEmotions and ImgFlip)
 
-This directory contains the minimal files required for the GoEmotions-based GPT-2 models used in PerToon for emotion-driven captioning.
+This directory contains the minimal files required for the GPT-2 models used in PerToon for emotion-driven captioning.
 
 ## Model Subdirectories
 
 - `gpt2-base-goemotions/`
 - `gpt2-medium-goemotions/`
+- `gpt2-base-imgflip/`
+- `gpt2-medium-imgflip/`
 
 Each contains the minimal set of files needed for inference:
 - `config.json`
@@ -37,11 +39,13 @@ python models/download_nlp_models.py
 This will automatically download the following files:
 - `gpt2-base-goemotions/model.safetensors` ([Google Drive link](https://drive.google.com/file/d/17IpJtKG6ZHy_IxtkQ36FiIAiChg5hrK0/view?usp=sharing))
 - `gpt2-medium-goemotions/model.safetensors` ([Google Drive link](https://drive.google.com/file/d/1CTMlPJ4MWSu7xxbX65hWb_TpD-U7GUIr/view?usp=sharing))
+- `gpt2-base-imgflip/model.safetensors` ([Google Drive link](https://drive.google.com/file/d/1S27w8gKG9lP8e_a5tobQwzLdjzp_gv1t/view?usp=sharing))
+- `gpt2-medium-imgflip/model.safetensors` ([Google Drive link](https://drive.google.com/file/d/1KeTPzHAfa0UtrwGafi1kxD5uU6bmIbRC/view?usp=sharing))
 
 ### Option 2: Manual Download
 
-1. Download `model.safetensors` for each model from the links above.
-2. Place them in the appropriate subdirectory (e.g., `models/gpt2-base-goemotions/`).
+1. Download `model.safetensors` for each model from the links above. If links for ImgFlip models are not provided here, use your own storage links.
+2. Place them in the appropriate subdirectory (e.g., `models/gpt2-base-goemotions/`, `models/gpt2-base-imgflip/`).
 
 ## What is committed vs. ignored?
 
@@ -69,6 +73,22 @@ models/
 │   ├── tokenizer_config.json
 │   ├── vocab.json
 │   └── model.safetensors
+├── gpt2-base-imgflip/
+│   ├── config.json
+│   ├── generation_config.json
+│   ├── special_tokens_map.json
+│   ├── tokenizer_config.json
+│   ├── merges.txt
+│   ├── vocab.json
+│   └── model.safetensors
+└── gpt2-medium-imgflip/
+    ├── config.json
+    ├── generation_config.json
+    ├── special_tokens_map.json
+    ├── tokenizer_config.json
+    ├── merges.txt
+    ├── vocab.json
+    └── model.safetensors
 ```
 
 ## Notes

@@ -34,7 +34,9 @@ PerToon/
 ├── helpers/          # Utility functions and shared logic
 ├── models/           # Model assets (vision and NLP)
 │   ├── gpt2-base-goemotions/      # Fine-tuned GPT-2 (GoEmotions, base)
-│   └── gpt2-medium-goemotions/    # Fine-tuned GPT-2 (GoEmotions, medium)
+│   ├── gpt2-medium-goemotions/    # Fine-tuned GPT-2 (GoEmotions, medium)
+│   ├── gpt2-base-imgflip/         # Fine-tuned GPT-2 (ImgFlip, base)
+│   └── gpt2-medium-imgflip/       # Fine-tuned GPT-2 (ImgFlip, medium)
 ├── scripts/          # Main pipeline implementation (Jupyter notebooks)
 │   ├── 1a_image_acquisition.ipynb         # Dataset collection and initial processing
 │   ├── 1b_image_processing.ipynb          # Image preprocessing and augmentation
@@ -113,8 +115,8 @@ docker run -it --gpus all -v $(pwd):/app -p 8080:8080 pertoon jupyter notebook -
    # Download vision models (cartoonization)
    python models/download_vision_models.py
 
-   # Download NLP model weights (caption generation)
-   python models/download_nlp_models.py
+    # Download NLP model weights (caption generation)
+    python models/download_nlp_models.py
    ```
 
    **Manual download (alternative):**
