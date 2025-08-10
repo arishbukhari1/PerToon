@@ -42,7 +42,7 @@ After downloading, you should have:
 
 ```
 models/
-├── README.md (this file)
+├── README_vision.md (this file)
 ├── download_vision_models.py (vision model download script)
 ├── genA2B_final.pth
 └── genB2A_final.pth
@@ -52,4 +52,4 @@ The model files are typically several hundred MB each.
 
 ## Note
 
-These files are excluded from Git tracking via `.gitignore` to prevent repository bloat. Each model file contains the trained weights for the cartoon generation neural network. 
+These files are excluded from Git tracking via `.gitignore` to prevent repository bloat. Each model file contains the trained weights for the cartoon generation neural network.
