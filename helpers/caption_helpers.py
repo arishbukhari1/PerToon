@@ -690,8 +690,10 @@ def intelligent_meme_parser(generated_text, mood=None):
             bottom_text = ' '.join(words[best_break:]).strip()
     
     # Clean and format the text parts
-    top_text = top_text.strip('.,!?').strip().upper()
-    bottom_text = bottom_text.strip('.,!?').strip().upper()
+    # top_text = top_text.strip('.,!?').strip().upper()
+    # bottom_text = bottom_text.strip('.,!?').strip().upper()
+    top_text = top_text.strip('.,!?"\'').strip().upper()
+    bottom_text = bottom_text.strip('.,!?"\'').strip().upper()
     
     # Ensure reasonable length limits
     if len(top_text.split()) > 8:
@@ -708,6 +710,138 @@ def intelligent_meme_parser(generated_text, mood=None):
         'original_text': generated_text,
         'parsing_method': 'existing_format' if top_match else 'intelligent_split',
         'mood': mood
+    }
+
+def generate_robust_meme_caption(
+    mood,
+    generator,
+    max_attempts=5,
+    max_chars=40,
+    temperature=0.85,  # NEW: Temperature is now a parameter
+):
+    """
+    Generate a concise, punctuated meme caption with placeholder replacement and robust parsing.
+    ... (docstring remains the same) ...
+    """
+    import random as _random
+    import re as _re  # CLEANUP: Consolidated import
+
+    prompt = f"Generate a {mood} meme caption: "
+
+    # Sampling settings
+    repetition_penalty = 1.3
+    top_p = 0.90
+    max_new_tokens = max(16, min(64, max_chars))
+
+    best_text = None
+    for _ in range(max_attempts):
+        outputs = generator(
+            prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,  # Uses the new parameter
+            do_sample=True,
+            top_p=top_p,
+            pad_token_id=50256,
+            eos_token_id=50256,
+            repetition_penalty=repetition_penalty,
+            num_beams=1,
+            num_return_sequences=5,
+        )
+
+        candidates = []
+        for out in outputs:
+            text = out.get("generated_text", "")
+            if text.startswith(prompt):
+                text = text[len(prompt) :].strip()
+            eos_token = "<|endoftext|>"
+            if eos_token in text:
+                text = text.split(eos_token)[0].strip()
+            if text:
+                candidates.append(text.strip())
+
+        if not candidates:
+            continue
+
+        def is_concise_and_complete(t: str) -> bool:
+            return len(t) < max_chars and (
+                t.endswith(".") or t.endswith("!") or t.endswith("?")
+            )
+
+        selected = None
+        for c in candidates:
+            if is_concise_and_complete(c):
+                selected = c
+                break
+
+        # FIXED: Only break the main loop if we found a high-quality caption.
+        # Otherwise, continue to the next attempt.
+        if selected:
+            best_text = selected
+            break
+        else:
+            # If no high-quality one was found, provisionally select the shortest
+            # and let the loop run again to try for a better one.
+            best_text = min(candidates, key=lambda s: len(s))
+
+    if best_text is None:
+        return {
+            "mood": mood,
+            "top_text": "ERROR",
+            "bottom_text": "GENERATION FAILED",
+            "full_caption": "ERROR: GENERATION FAILED",
+        }
+
+    # Truncate to the first complete sentence
+    first_sentence_match = _re.search(r"[^.!?]+[.!?]", best_text)
+    if first_sentence_match:
+        best_text = first_sentence_match.group(0).strip()
+
+    # Context-aware placeholder replacement
+    # ... (rest of the function is the same) ...
+    placeholder_map = {
+        "positive": ["LEGEND", "CHAMP", "HERO", "FAM"],
+        "negative": ["MY GUY", "BUDDY", "PAL", "KAREN"],
+        "anger": ["BRO", "KYLE", "MY GUY"],
+        "neutral": ["DUDE", "SOMEONE", "THAT GUY"],
+    }
+
+    mood_lower = (mood or "").lower()
+    positive_moods = {
+        "joy", "love", "amusement", "gratitude", "excitement", "pride", "relief",
+        "optimism", "admiration", "approval", "curiosity", "desire", "surprise"
+    }
+    anger_moods = {"anger", "annoyance", "rage", "irritation", "frustration"}
+    negative_moods = {
+        "sadness", "grief", "disappointment", "regret", "disgust", "shame", "guilt",
+        "fear", "nervousness", "remorse"
+    }
+
+    if mood_lower in anger_moods:
+        category = "anger"
+    elif mood_lower in positive_moods:
+        category = "positive"
+    elif mood_lower in negative_moods:
+        category = "negative"
+    else:
+        category = "neutral"
+
+    replacement = _random.choice(placeholder_map.get(category, placeholder_map["neutral"]))
+    
+    replaced_text = _re.sub(r"\[NAME\]", replacement, best_text)
+    replaced_text = _re.sub(r"\bNAME\b", replacement, replaced_text)
+    
+    parsed = intelligent_meme_parser(replaced_text, mood=mood)
+    top_text = (parsed.get("top") or "").strip()
+    bottom_text = (parsed.get("bottom") or "").strip()
+    
+    top_text = top_text.rstrip(".!?").strip()
+    bottom_text = bottom_text.rstrip(".!?").strip()
+
+    return {
+        "top_text": top_text,
+        "bottom_text": bottom_text,
+        "mood": mood,
+        "full_caption": replaced_text,
     }
 
 def fine_tune_gpt2_enhanced(tokenized_dataset, tokenizer, output_dir,
