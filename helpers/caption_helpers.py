@@ -1,53 +1,129 @@
 from transformers import pipeline, GPT2LMHeadModel, GPT2Tokenizer
+import torch
 from textblob import TextBlob
 import re
 import os
 
-def load_fine_tuned_model(model_path=None, project_root=None, model_name="gpt2-mood-caption-v2", dataset_name=None):
+def load_fine_tuned_model(
+    model_path: str | None = None,
+    project_root: str | None = None,
+    model_name: str | None = None,
+    dataset_name: str | None = None,
+    model_size: str | None = None,
+):
     """
-    Load a fine-tuned GPT-2 model with path flexibility for different environments.
-    
+    Load a fine-tuned GPT-2 model with flexible path resolution.
+
+    Supports the new canonical directories:
+      - gpt2-base-goemotions
+      - gpt2-medium-goemotions
+      - gpt2-base-imgflip
+      - gpt2-medium-imgflip
+
+    Backward compatible with previous defaults (e.g., gpt2-mood-caption-v2).
+
     Args:
-        model_path (str, optional): Direct path to the model. If None, constructs from project_root
-        project_root (str, optional): Root path of the project. If None, uses "../" for local runs
-        model_name (str): Name of the model directory
-        dataset_name (str, optional): Dataset name for unified model naming (goemotions/imgflip)
-        
+        model_path: Direct path to the model directory. If provided, used as-is.
+        project_root: Project root directory. Defaults to ".." if not provided.
+        model_name: Specific model directory name under models/. If one of the four
+                    canonical names above, it will be resolved automatically.
+        dataset_name: Optional dataset alias ("goemotions" or "imgflip").
+        model_size: Optional size alias ("base" or "medium"). Used with dataset_name.
+
     Returns:
-        pipeline: Text generation pipeline with the loaded model
+        transformers.Pipeline: Text generation pipeline with the loaded model
     """
+
     # Set default paths based on environment
     if project_root is None:
         project_root = ".."  # Default for local environment
-    
+
+    # Resolve model_path if not explicitly provided
     if model_path is None:
-        # Support unified dataset-specific model names
-        if dataset_name:
-            model_path = f"{project_root}/models/gpt2-mood-caption-{dataset_name}-v1"
+        resolved_name = None
+
+        # If model_name directly matches one of the new directories, use it
+        valid_names = {
+            "gpt2-base-goemotions",
+            "gpt2-medium-goemotions",
+            "gpt2-base-imgflip",
+            "gpt2-medium-imgflip",
+            "gpt2-mood-caption-v2",  # legacy
+        }
+
+        if model_name in valid_names:
+            resolved_name = model_name
+        elif dataset_name in {"goemotions", "imgflip"}:
+            size = (model_size or "base").lower()
+            if size not in {"base", "medium"}:
+                size = "base"
+            resolved_name = f"gpt2-{size}-{dataset_name}"
         else:
-            model_path = f"{project_root}/models/{model_name}"
-    
+            # Fallback to provided/legacy model_name or legacy default
+            resolved_name = (model_name or "gpt2-mood-caption-v2")
+
+        model_path = f"{project_root}/models/{resolved_name}"
+
     # Check if model exists
-    if not os.path.exists(model_path):
+    if not os.path.isdir(model_path):
         print(f"  Model not found at {model_path}")
         print("Falling back to baseline GPT-2 model...")
-        return pipeline("text-generation", model="gpt2", tokenizer="gpt2")
-    
+        return pipeline(
+            "text-generation",
+            model="gpt2",
+            tokenizer="gpt2",
+            device=0 if torch.cuda.is_available() else -1,
+        )
+
     try:
         # Load the fine-tuned model
         print(f" Loading fine-tuned model from: {model_path}")
         model = GPT2LMHeadModel.from_pretrained(model_path)
         tokenizer = GPT2Tokenizer.from_pretrained(model_path)
-        
-        # Create pipeline
-        generator = pipeline("text-generation", model=model, tokenizer=tokenizer)
-        print(f" Successfully loaded fine-tuned model!")
+
+        # Ensure pad token is set
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        # Create pipeline with device awareness
+        generator = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            device=0 if torch.cuda.is_available() else -1,
+        )
+        print(" Successfully loaded fine-tuned model!")
         return generator
-        
+
     except Exception as e:
         print(f" Error loading fine-tuned model: {e}")
         print("Falling back to baseline GPT-2 model...")
-        return pipeline("text-generation", model="gpt2", tokenizer="gpt2")
+        return pipeline(
+            "text-generation",
+            model="gpt2",
+            tokenizer="gpt2",
+            device=0 if torch.cuda.is_available() else -1,
+        )
+
+
+def load_named_model(dataset: str, size: str = "base", project_root: str | None = None):
+    """
+    Convenience wrapper to load one of the four canonical models by alias.
+
+    Example:
+        load_named_model("imgflip", size="medium")
+    """
+    dataset = (dataset or "").lower()
+    size = (size or "base").lower()
+    if dataset not in {"goemotions", "imgflip"}:
+        raise ValueError("dataset must be 'goemotions' or 'imgflip'")
+    if size not in {"base", "medium"}:
+        raise ValueError("size must be 'base' or 'medium'")
+    return load_fine_tuned_model(
+        project_root=project_root,
+        dataset_name=dataset,
+        model_size=size,
+    )
 
 def generate_meme_caption(mood, generator, model_type="fine_tuned", max_length=40, temperature=0.95, num_return_sequences=1, diversity_mode="high", project_root=None):
     """
@@ -280,6 +356,91 @@ def parse_meme_format(generated_text):
     
     return top_text, bottom_text
 
+def generate_meme_caption_simple(
+    mood,
+    generator,
+    model_type="fine_tuned",
+    max_length=40,
+    temperature=0.95,
+    num_return_sequences=1,
+    prompt_style: str = "trained",
+):
+    """
+    Generate a meme caption using a simple prompt without diversity hints.
+
+    This function avoids the dynamic few-shot example used in generate_meme_caption
+    and instead relies on a minimal, direct prompt. Useful when the few-shot
+    hinting appears to bias outputs or reduce controllability.
+
+    Args:
+        mood (str): Target emotion (e.g., 'joy', 'sadness').
+        generator: Hugging Face text-generation pipeline.
+        model_type (str): 'fine_tuned' or 'baseline'.
+        max_length (int): Max new tokens to generate.
+        temperature (float): Sampling temperature.
+        num_return_sequences (int): Number of captions to generate.
+
+    Returns:
+        dict | list[dict]: Caption dict or list of dicts when num_return_sequences > 1.
+    """
+    # Construct prompt according to style
+    prompt_style = (prompt_style or "trained").lower()
+    if prompt_style == "conversational":
+        prompt = f"I feel {mood}, and I want to say: "
+    else:
+        # Default to training-aligned phrasing found in dataset_factory and notebooks
+        prompt = f"Generate a {mood} meme caption: "
+
+    try:
+        outputs = generator(
+            prompt,
+            max_new_tokens=max_length,
+            temperature=temperature,
+            do_sample=True,
+            top_p=0.9,
+            pad_token_id=50256,
+            eos_token_id=50256,
+            repetition_penalty=1.1,
+            num_beams=1,
+            num_return_sequences=num_return_sequences,
+        )
+
+        results = []
+        for output in outputs:
+            generated_text = output["generated_text"].replace(prompt, "").strip()
+
+            # Use intelligent parser that doesn't require TOP/BOTTOM in training
+            parsed = intelligent_meme_parser(generated_text, mood=mood)
+            top_text = parsed.get("top", "")
+            bottom_text = parsed.get("bottom", "")
+
+            full_caption = f"{top_text} {bottom_text}".strip()
+            polarity = TextBlob(full_caption).sentiment.polarity
+
+            results.append({
+                "mood": mood,
+                "top_text": top_text,
+                "bottom_text": bottom_text,
+                "full_caption": full_caption,
+                "polarity": polarity,
+                "model_type": model_type,
+                "raw_output": generated_text,
+            })
+
+        return results[0] if num_return_sequences == 1 else results
+
+    except Exception as e:
+        print(f"Error generating simple caption for mood '{mood}': {str(e)}")
+        return {
+            "mood": mood,
+            "top_text": "ERROR",
+            "bottom_text": "GENERATION FAILED",
+            "full_caption": "ERROR: GENERATION FAILED",
+            "polarity": 0.0,
+            "model_type": model_type,
+            "raw_output": str(e),
+        }
+
 def display_meme_caption(caption_result, show_metadata=True):
     """
     Display a meme caption with top and bottom text only (no image box).
@@ -470,6 +631,9 @@ def intelligent_meme_parser(generated_text, mood=None):
     # Remove any prompt artifacts
     if mood and f"Generate a {mood}" in text:
         text = re.sub(rf"Generate a {mood} meme caption:?\s*", "", text, flags=re.IGNORECASE)
+    # Also strip conversational preamble if present
+    if mood and f"I feel {mood}, and I want to say:" in text:
+        text = re.sub(rf"I feel {mood},\s*and I want to say:\s*", "", text, flags=re.IGNORECASE)
     
     # Remove endoftext token if present
     text = text.replace("<|endoftext|>", "").strip()
